@@ -60,4 +60,9 @@ int  compressVideo( const pcc::PCCEncoderParameters& encoderParams,
                     const pcc::PCCMetricsParameters& metricsParams,
                     pcc::chrono::StopwatchUserTime& );
 
+//rahul's code
+uint64_t isMatchingPoint(pcc::PCCNNResult& currRes, pcc::PCCNNResult& refRes, const pcc::PCCPointSet3& currFrame, const pcc::PCCPointSet3& refFrame); 
+uint32_t genMotionData(const pcc::PCCPointSet3& currFrame, const pcc::PCCPointSet3& refFrame, std::vector<pcc::PCCVideo<uint16_t, 3>>& vid); 
+
+
 #endif /* PCC_APP_DECODER_H */

@@ -48,7 +48,9 @@ template <typename T>
 void PCCHMLibVideoDecoderImpl<T>::decode( PCCVideoBitstream& bitstream,
                                           size_t             outputBitDepth,
                                           bool               RGB2GBR,
-                                          PCCVideo<T, 3>&    video ) {
+                                          PCCVideo<T, 3>&    video,
+                                          bool lossyChannel
+                                           ) {
   std::string         s( reinterpret_cast<char*>( bitstream.buffer() ), bitstream.size() );
   std::istringstream  iss( s );
   std::istream&       bitstreamFile = iss;
@@ -69,6 +71,12 @@ void PCCHMLibVideoDecoderImpl<T>::decode( PCCVideoBitstream& bitstream,
   // main decoder loop
   Bool openedReconFile = false;  // reconstruction file not yet opened. (must be performed after SPS is seen)
   Bool loopFiltered    = false;
+
+  //Rahul's code 
+  int mxPacketToThrow = 1;
+  int packetThrowCount = 0;
+  int timer = 0;
+
   while ( !!bitstreamFile ) {
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
     TComCodingStatistics::TComCodingStatisticsData backupStats( TComCodingStatistics::GetStatistics() );
@@ -79,12 +87,33 @@ void PCCHMLibVideoDecoderImpl<T>::decode( PCCVideoBitstream& bitstream,
     AnnexBStats  stats = AnnexBStats();
     InputNALUnit nalu;
     byteStreamNALUnit( bytestream, nalu.getBitstream().getFifo(), stats );
+    
     // call actual decoding function
     Bool bNewPicture = false;
     if ( nalu.getBitstream().getFifo().empty() ) {
       fprintf( stderr, "Warning: Attempt to decode an empty NAL unit\n" );
     } else {
       read( nalu );
+
+      std::cout << "IN LOOP "
+                << " " << nalu.m_nalUnitType << " " << lossyChannel << "\n";
+      
+      //Rahul's code 
+      //here we throw a packet away if we need to (check the type too)
+      //we avoid throwing VPS/SPS etc.
+      int typ = nalu.m_nalUnitType;
+      bool okToThrow = typ == 1;
+      if (lossyChannel && okToThrow && packetThrowCount < mxPacketToThrow) {
+        std::cout << "CHECKING " << " " << nalu.m_nalUnitType << "\n";
+        if (timer >= 0) {
+          std::cout << "THROWING: " << " " << nalu.m_nalUnitType << "\n";
+          packetThrowCount++;
+          continue;
+        }
+
+        timer++;
+      }
+
       bNewPicture = m_cTDecTop.decode( nalu, m_iSkipFrame, m_iPOCLastDisplay );
       if ( bNewPicture ) {
         bitstreamFile.clear();

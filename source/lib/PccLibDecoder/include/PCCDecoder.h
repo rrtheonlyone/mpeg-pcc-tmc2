@@ -39,6 +39,8 @@
 #include "PCCMath.h"
 #include "PCCPatch.h"
 
+#include "PCCKdTree.h"
+
 namespace pcc {
 
 class PCCContext;
@@ -58,6 +60,14 @@ class PCCDecoder : public PCCCodec {
  public:
   PCCDecoder();
   ~PCCDecoder();
+
+  //rahul code
+  uint32_t isMatchingPoint( PCCNNResult&        currRes,
+                        PCCNNResult&        refRes,
+                        const PCCPointSet3& currFrame,
+                        const PCCPointSet3& refFrame );
+  void genMotionData( const PCCPointSet3& p1, const PCCPointSet3& p2 );
+  void reconstructUsingMotion(PCCPointSet3& frame, PCCPointSet3& ref); 
 
   int decode( PCCContext& context, PCCGroupOfFrames& reconstruct, int32_t atlasIndex );
 

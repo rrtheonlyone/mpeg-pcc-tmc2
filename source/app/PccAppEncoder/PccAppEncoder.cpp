@@ -890,6 +890,11 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
 
   PCCBitstreamStat    bitstreamStat;
   SampleStreamV3CUnit ssvu;
+
+  //rahul's code 
+  int refImage = -1;
+  pcc::PCCPointSet3 ref;
+
   // Place to get/set default values for gof metadata enabled flags (in sequence
   // level).
   while ( startFrameNumber < endFrameNumber0 ) {
@@ -909,9 +914,31 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
       endFrameNumber0 = endFrameNumber;
     }
     clock.start();
+
     std::cout << "Compressing group of frames " << contextIndex << ": " << startFrameNumber << " -> " << endFrameNumber
               << "..." << std::endl;
+    
+    if (refImage != -1) {
+        std::cout << "LET's COMPARE MOTION NOW!" << std::endl;
+
+        //create yuv files 
+        std::vector<pcc::PCCVideo<uint16_t, 3>> vid;
+        auto compressOk = genMotionData(sources[0], ref, vid);
+
+        //motion estimation succesful, we move onto next frame 
+        if (compressOk) {
+          continue;
+        }
+    }
+
+    refImage = contextIndex;
+    ref = sources[0];
     int ret = encoder.encode( sources, context, reconstructs );
+    auto& p = context.getFrames()[0].getPointToPixel();
+    for (int i = 0; i < 5; i++) {
+      cout << i << " " << " " << sources[0][i] << " " << p[i] << "\n";
+    }
+
     PCCBitstreamWriter bitstreamWriter;
 #ifdef BITSTREAM_TRACE
     PCCBitstream bitstream;
@@ -977,4 +1004,103 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
     checksum.write( encoderParams.compressedStreamPath_ );
   }
   return checksumEqual ? 0 : -1;
+}
+
+//rahul code
+uint64_t isMatchingPoint(PCCNNResult& currRes, PCCNNResult& refRes, const pcc::PCCPointSet3& currFrame, const pcc::PCCPointSet3& refFrame) {
+  size_t N = currRes.size();
+  uint64_t sum = 0;
+
+  for (size_t i = 0; i < N; i++) {
+    auto c1 = currFrame.getColor(currRes.indices(i));
+    auto c2 = refFrame.getColor(refRes.indices(i));
+    auto cx = c1 - c2;
+    uint64_t s = (uint64_t)cx[0]*cx[0] + (uint64_t)cx[1]*cx[1] + (uint64_t)cx[2]*cx[2];
+    sum += s;
+  } 
+
+  return sum;
+}
+
+//rahul code
+uint32_t genMotionData(const pcc::PCCPointSet3& currFrame, const pcc::PCCPointSet3& refFrame, std::vector<pcc::PCCVideo<uint16_t, 3>>& vid) {
+  int P = currFrame.getPointCount();
+  int R = refFrame.getPointCount();
+
+  //constants 
+  int distThreshold = 10;
+  size_t K = 10;
+  uint32_t colorThreshold = (1 << 10);
+  int maxPoints = R * (3 / 4);
+
+  //kd-trees for fast neighbour search
+  PCCKdTree kdTreeCurr(currFrame);
+  PCCKdTree kdTreeRef(refFrame);
+
+  PCCVideo<uint16_t, 3> vid1;
+  PCCVideo<uint16_t, 3> vid2;
+  PCCVideo<uint16_t, 3> vid3;
+
+  uint32_t cnt = 0;
+  for (int i = 0; i < P; i++) {
+    auto currPoint = currFrame[i];
+
+    //get k nearest neighbours 
+    PCCNNResult closestToCurr;
+    kdTreeCurr.search(currPoint, K, closestToCurr);
+
+    int best = -1;
+    uint64_t w = 0;
+
+    //get points in range from current in ref 
+    for (int j = 0; j < R; j++) {
+      auto refPoint = refFrame[j];
+
+      auto dx = refPoint - currPoint;
+      uint64_t ds = (uint64_t)dx[0]*dx[0] + (uint64_t)dx[1]*dx[1] + (uint64_t)dx[2]*dx[2];
+      
+      //check if reference point is within range 
+      if (ds > distThreshold * distThreshold) {
+        continue;
+      }
+
+      //ref point within range 
+      PCCNNResult closestToRef;
+      kdTreeRef.search(refPoint, K, closestToRef);
+
+      //now we do closest point check 
+      uint64_t nx = isMatchingPoint(closestToCurr, closestToRef, currFrame, refFrame);
+
+      uint64_t currVal = nx / (3 * K);
+      //std::cout << "CHECK: " << i << " " << j << " " << currVal << "\n";
+      
+      if (best == -1 || currVal < w) {
+        w = currVal;
+        best = j;
+      }
+    }
+
+    if (best != -1 && w < colorThreshold) {
+      //get position motion vector
+      auto mv = currPoint - refFrame[best];
+
+      //get color motion vector 
+      auto dt = currFrame.getColor(i) - refFrame.getColor(best);
+
+      /*
+       * Motion File Structure
+       * [Current Index] [Matching Index in Ref] [dx] [dy] [dz] [dr] [dg] [db]
+       * dx dy dz: motion vector (offset in position)
+       * dr dg db: delta information for change in colour
+       */
+      //std::cout << i << " " << best << " ";
+      //std::cout << mv[0] << " " << mv[1] << " " << mv[2] << " ";
+      //std::cout << dt[0] << " " << dt[1] << " " << dt[2] << "\n";
+      
+      cnt++;
+    }    
+    //std::cout << "Closest Point to [" << i << "]: " << best << " " << w << "\n";
+  }
+
+  return cnt >= maxPoints; 
 }

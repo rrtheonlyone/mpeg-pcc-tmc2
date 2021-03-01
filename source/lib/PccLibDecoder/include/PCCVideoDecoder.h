@@ -88,7 +88,9 @@ class PCCVideoDecoder {
 #else
     decoder = std::make_shared<PCCHMAppVideoDecoder<T>>();
 #endif
+
     decoder->decode( bitstream, bitDepth == 8 ? 8 : 10, use444CodecIo, video, decoderPath, fileName, frameCount );
+
     width  = video.getWidth();
     height = video.getHeight();
     const std::string yuvRecFileName =

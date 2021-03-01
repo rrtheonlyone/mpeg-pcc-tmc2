@@ -53,6 +53,134 @@ PCCDecoder::PCCDecoder() {
 PCCDecoder::~PCCDecoder() = default;
 void PCCDecoder::setParameters( const PCCDecoderParameters& params ) { params_ = params; }
 
+//rahul code
+uint32_t PCCDecoder::isMatchingPoint(PCCNNResult& currRes, PCCNNResult& refRes, const PCCPointSet3& currFrame, const PCCPointSet3& refFrame) {
+  size_t N = currRes.size();
+  uint32_t sum = 0;
+
+  for (size_t i = 0; i < N; i++) {
+    auto c1 = currFrame.getColor16bit(currRes.indices(i));
+    auto c2 = refFrame.getColor16bit(refRes.indices(i));
+    auto cx = c1 - c2;
+
+    uint32_t s = (uint32_t)cx[0]*cx[0] + (uint32_t)cx[1]*cx[1] + (uint32_t)cx[2]*cx[2];
+    sum += s;
+  } 
+
+  return sum;
+}
+
+//rahul code
+void PCCDecoder::genMotionData(const PCCPointSet3& currFrame, const PCCPointSet3& refFrame) {
+  int P = currFrame.getPointCount();
+  int R = refFrame.getPointCount();
+
+  //constants 
+  int distThreshold = 100;
+  size_t K = 5;
+  uint32_t colorThreshold = (1 << 10);
+
+  //kd-trees for fast neighbour search
+  PCCKdTree kdTreeCurr(currFrame);
+  PCCKdTree kdTreeRef(refFrame);
+
+  std:ofstream motionFile;
+  motionFile.open("motion_estimation.txt");
+
+  PCCPointSet3 np;
+
+  for (int i = 1234; i < P; i++) {
+    auto currPoint = currFrame[i];
+
+    //get k nearest neighbours 
+    PCCNNResult closestToCurr;
+    kdTreeCurr.search(currPoint, K, closestToCurr);
+
+    int best = -1;
+    uint32_t w = 0;
+
+    //get points in range from current in ref 
+    for (int j = i; j < min(R, i + 100); j++) {
+      auto refPoint = refFrame[j];
+
+      auto dx = refPoint - currPoint;
+      uint32_t ds = (uint32_t)dx[0]*dx[0] + (uint32_t)dx[1]*dx[1] + (uint32_t)dx[2]*dx[2];
+      cout << ds << "\n"; 
+      //check if reference point is within range 
+      if (ds > distThreshold * distThreshold) {
+        continue;
+      }
+
+      //ref point within range 
+      PCCNNResult closestToRef;
+      kdTreeRef.search(refPoint, K, closestToRef);
+
+      //now we do closest point check 
+      uint32_t nx = isMatchingPoint(closestToCurr, closestToRef, currFrame, refFrame);
+
+      uint32_t currVal = nx / (3 * K);
+      //cout << i << " " << j << " " << currVal << "\n";
+      
+      if (best == -1 || currVal < w) {
+        w = currVal;
+        best = j;
+      }
+
+      if (w < colorThreshold) break;
+    }
+
+    if (best != -1 && w < colorThreshold) {
+      //get position motion vector
+      auto mv = currPoint - refFrame[best];
+
+      //get color motion vector 
+      auto dt = currFrame.getColor16bit(i) - refFrame.getColor16bit(best);
+
+      /*
+       * Motion File Structure
+       * [Current Index] [Matching Index in Ref] [dx] [dy] [dz] [dr] [dg] [db]
+       * dx dy dz: motion vector (offset in position)
+       * dr dg db: delta information for change in colour
+       */
+      motionFile << i << " " << best << " ";
+      motionFile << mv[0] << " " << mv[1] << " " << mv[2] << " ";
+      motionFile << dt[0] << " " << dt[1] << " " << dt[2] << "\n";
+
+      cout << "HIT! " << mv.getNorm2() << " " << mv[0] << " " << mv[1] << " " << mv[2] << "\n";
+    }    
+    std::cout << "Closest Point to [" << i << "]: " << best << " " << w << "\n";
+  }
+
+  motionFile.close();
+}
+
+void PCCDecoder::reconstructUsingMotion(PCCPointSet3& frame, PCCPointSet3& ref) {
+  std::ifstream motionFile( "motion_estimation.txt" );
+
+  int currI, refI, dx, dy, dz, dr, dg, db;
+
+  PCCPointSet3 newPointCloud;
+  newPointCloud.addColors();
+
+  while (motionFile >> currI >> refI >> dx >> dy >> dz >> dr >> dg >> db) {
+      auto p = ref[refI];
+      p[0] += dx;
+      p[1] += dy;
+      p[2] += dz;
+
+      auto c = ref.getColor16bit(refI);
+      c[0] += dr;
+      c[1] += dg;
+      c[2] += db;
+
+      auto a = newPointCloud.addPoint(p);
+      newPointCloud.setColor16bit(a, c);
+  }
+
+  cout << "updated point cloud" << "\n";
+  frame = newPointCloud;
+}
+
 int PCCDecoder::decode( PCCContext& context, PCCGroupOfFrames& reconstructs, int32_t atlasIndex = 0 ) {
   if ( params_.nbThread_ > 0 ) { tbb::task_scheduler_init init( static_cast<int>( params_.nbThread_ ) ); }
 #ifdef CODEC_TRACE
@@ -293,6 +421,13 @@ int PCCDecoder::decode( PCCContext& context, PCCGroupOfFrames& reconstructs, int
                        sps.getMultipleMapStreamsPresentFlag( ATLASIDXPCC ), ai.getAttributeCount(), gpcParams );
     }
 
+    // rahul's code
+    // can we do some copying here?
+    std::cout << frame.getIndex() << "\n";
+    if (frame.getIndex() == 1) {
+      //reconstructUsingMotion(reconstruct, reconstructs[0]);
+    } 
+
     // Post-Processing
     TRACE_CODEC( "Post-Processing: postprocessSmoothing = %zu pbfEnableFlag = %d \n",
                  params_.postprocessSmoothingFilter_, ppSEIParams.pbfEnableFlag_ );
@@ -336,7 +471,15 @@ int PCCDecoder::decode( PCCContext& context, PCCGroupOfFrames& reconstructs, int
       TRACE_CODEC( "lossy: lossless: copy 16-bit RGB to 8-bit RGB (copyRGB16ToRGB8) \n" );
       reconstruct.copyRGB16ToRGB8();
     }
+
+    // rahul's code
+    // can we do some copying here?
+    std::cout << frame.getIndex() << "\n";
+    if (frame.getIndex() == 1) {
+      genMotionData(reconstruct, reconstructs[0]);
+    }
   }
+
 #ifdef CODEC_TRACE
   setTrace( false );
   closeTrace();
