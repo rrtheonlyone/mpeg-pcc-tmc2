@@ -2,16 +2,16 @@
 
 MAINDIR=$( dirname $( cd "$( dirname $0 )" && pwd ) );
 EXTERNAL=$( dirname $MAINDIR )/external_pkg
-if [ ! -d $EXTERNAL ] ; then EXTERNAL=$( dirname $MAINDIR )/external; fi
-
+if [ ! -d $EXTERNAL ] ; then EXTERNAL=$MAINDIR/external; fi
+echo $EXTERNAL
 ## Input parameters
-SRCDIR=${MAINDIR}/../ply/ # note: this directory must containt: http://mpegfs.int-evry.fr/MPEG/PCC/DataSets/pointCloud/CfP/datasets/Dynamic_Objects/People                            
+SRCDIR=${MAINDIR}/loot/ # note: this directory must containt: http://mpegfs.int-evry.fr/MPEG/PCC/DataSets/pointCloud/CfP/datasets/Dynamic_Objects/People                            
 CFGDIR=${MAINDIR}/cfg/
 
-SEQ=25;       # in [22;26]
-COND=2;       # in [C2AI, C2LD, CWAI, CWRA]
+SEQ=23;       # in [22;26]
+COND=C2AI;       # in [C2AI, C2LD, CWAI, CWRA]
 RATE=2;       # in [1;5]
-FRAMECOUNT=1;
+FRAMECOUNT=3;
 THREAD=1;
 
 ## Set external tool paths
@@ -101,8 +101,8 @@ case $COND in
 esac
 
 ## Encoder 
-if [ ! -f $BIN ] 
-then 
+#if [ ! -f $BIN ] 
+#then 
   $ENCODER \
     --config=${CFGDIR}${CFGCOMMON} \
     --config=${CFGDIR}${CFGSEQUENCE} \
@@ -111,19 +111,20 @@ then
     --configurationFolder=${CFGDIR} \
     --uncompressedDataFolder=${SRCDIR} \
     --frameCount=$FRAMECOUNT \
+    --groupOfFramesSize=1 \
     --colorSpaceConversionPath=$HDRCONVERT \
     --videoEncoderPath=$HMENCODER \
     --nbThread=$THREAD \
     --keepIntermediateFiles=1 \
     --reconstructedDataPath=${BIN%.???}_rec_%04d.ply \
     --compressedStreamPath=$BIN
-fi
+#fi
 
-## Decoder
-$DECODER \
-  --compressedStreamPath=$BIN \
-  --videoDecoderPath=${HMDECODER} \
-  --colorSpaceConversionPath=${HDRCONVERT} \
-  --inverseColorSpaceConversionConfig=${CFGDIR}/hdrconvert/yuv420toyuv444_16bit.cfg \
-  --nbThread=$THREAD \
-  --reconstructedDataPath=${BIN%.???}_dec_%04d.ply
+# Decoder
+#$DECODER \
+#  --compressedStreamPath=$BIN \
+#  --videoDecoderPath=${HMDECODER} \
+#  --colorSpaceConversionPath=${HDRCONVERT} \
+#  --inverseColorSpaceConversionConfig=${CFGDIR}/hdrconvert/yuv420toyuv444_16bit.cfg \
+#  --nbThread=$THREAD \
+#  --reconstructedDataPath=${BIN%.???}_dec_%04d.ply
