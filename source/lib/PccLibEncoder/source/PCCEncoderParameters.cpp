@@ -225,6 +225,9 @@ PCCEncoderParameters::PCCEncoderParameters() {
   uniformPartitionSpacing_      = true;
   tilePartitionWidth_           = 0;
   tilePartitionHeight_          = 0;
+
+  // Motion Encoding 
+  enableMotionEncoding_ = 0;
 }
 
 PCCEncoderParameters::~PCCEncoderParameters() = default;
@@ -511,6 +514,7 @@ void PCCEncoderParameters::print() {
   std::cout << "\t   pbfPassesCount                         " << pbfPassesCount_ << std::endl;
   std::cout << "\t   pbfFilterSize                          " << pbfFilterSize_ << std::endl;
   std::cout << "\t   pbfLog2Threshold                       " << pbfLog2Threshold_ << std::endl;
+  std::cout << "\t   enableMotionEncoding                   " << enableMotionEncoding_ << std::endl;
   std::cout << std::endl;
 }
 

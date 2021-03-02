@@ -283,6 +283,9 @@ class PCCEncoderParameters {
   bool   uniformPartitionSpacing_;
   size_t tilePartitionWidth_;
   size_t tilePartitionHeight_;
+
+  // Motion Encoding 
+  bool enableMotionEncoding_;
 };
 
 };  // namespace pcc
