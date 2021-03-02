@@ -833,7 +833,13 @@ bool parseParameters( int                   argc,
     ( "pbfLog2Threshold",
       encoderParams.pbfLog2Threshold_,
       encoderParams.pbfLog2Threshold_, 
-      "pbfLog2Threshold " );
+      "pbfLog2Threshold " )
+
+    // Motion Encoding 
+    ( "enableMotionEncoding",
+      encoderParams.enableMotionEncoding_,
+      encoderParams.enableMotionEncoding_, 
+      " enable motion encoding " );
 
     opts.addOptions()
     ( "computeChecksum", 
@@ -860,6 +866,7 @@ bool parseParameters( int                   argc,
       metricsParams.neighborsProc_,
       metricsParams.neighborsProc_,
       "0(undefined), 1(average), 2(weighted average), 3(min), 4(max) neighbors with same geometric distance" );
+
   // clang-format on
   po::setDefaults( opts );
   po::ErrorReporter        err;
@@ -947,6 +954,12 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
   metrics.setParameters( metricsParams );
   checksum.setParameters( metricsParams );
 
+  //Data needed for motion encoding 
+  PCCMotionEncoder motionEncoder;
+  PCCPointSet3 refPointCloud;
+  PCCPointSet3 currPointCloud;
+  int refPoint = -1;
+
   PCCBitstreamStat    bitstreamStat;
   SampleStreamV3CUnit ssvu;
   // Place to get/set default values for gof metadata enabled flags (in sequence level).
@@ -970,7 +983,15 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
 
     std::cout << "Compressing " << contextIndex << " frames " << startFrameNumber << " -> " << endFrameNumber << "..."
               << std::endl;
+    
+    if (encoderParams.enableMotionEncoding_ && refPoint != -1) {
+      std::cout << "Attempting to use motion encoding..." << std::endl;
+      bool ok = motionEncoder.genMotionData(sources[0], refPointCloud);
+
+    }    
+
     int                ret = encoder.encode( sources, context, reconstructs );
+    
     PCCBitstreamWriter bitstreamWriter;
 #ifdef BITSTREAM_TRACE
     bitstreamWriter.setLogger( logger );
@@ -1001,6 +1022,10 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
     if ( !encoderParams.reconstructedDataPath_.empty() ) {
       reconstructs.write( encoderParams.reconstructedDataPath_, reconstructedFrameNumber );
     }
+
+    refPoint = contextIndex;
+    refPointCloud = reconstructs[0];
+
     normals.clear();
     sources.clear();
     reconstructs.clear();
