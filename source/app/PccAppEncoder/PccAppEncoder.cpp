@@ -954,11 +954,11 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
   metrics.setParameters( metricsParams );
   checksum.setParameters( metricsParams );
 
-  //Data needed for motion encoding 
+  // Data needed for motion encoding
   PCCMotionEncoder motionEncoder;
-  PCCPointSet3 refPointCloud;
-  PCCPointSet3 currPointCloud;
-  int refPoint = -1;
+  PCCPointSet3     refPointCloud;
+  PCCPointSet3     currPointCloud;
+  int              refPoint = -1;
 
   PCCBitstreamStat    bitstreamStat;
   SampleStreamV3CUnit ssvu;
@@ -983,20 +983,30 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
 
     std::cout << "Compressing " << contextIndex << " frames " << startFrameNumber << " -> " << endFrameNumber << "..."
               << std::endl;
-    
-    if (encoderParams.enableMotionEncoding_ && refPoint != -1) {
+
+    int motionOk = 0;
+    if ( encoderParams.enableMotionEncoding_ && refPoint != -1 ) {
       std::cout << "Attempting to use motion encoding..." << std::endl;
-      bool ok = motionEncoder.genMotionData(sources[0], refPointCloud);
+      //motionOk = motionEncoder.buildMatchingPoints( sources[0], refPointCloud );
 
-    }    
+      //motionEncoder.writeAsPict( refPointCloud );
 
-    int                ret = encoder.encode( sources, context, reconstructs );
-    
-    PCCBitstreamWriter bitstreamWriter;
+      //std::string fname = "motion_stream";
+      //fname += std::to_string(contextIndex);
+      //fname += ".txt";
+      //motionEncoder.writeToFile(fname);
+    }
+
+    int ret = 0;
+    if ( !motionOk ) {
+      ret = encoder.encode( sources, context, reconstructs );
+
+      PCCBitstreamWriter bitstreamWriter;
 #ifdef BITSTREAM_TRACE
-    bitstreamWriter.setLogger( logger );
+      bitstreamWriter.setLogger( logger );
 #endif
-    ret |= bitstreamWriter.encode( context, ssvu );
+      ret |= bitstreamWriter.encode( context, ssvu );
+    }
 
     clock.stop();
 
@@ -1023,13 +1033,16 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
       reconstructs.write( encoderParams.reconstructedDataPath_, reconstructedFrameNumber );
     }
 
-    refPoint = contextIndex;
-    refPointCloud = reconstructs[0];
+    refPoint      = contextIndex;
+    if ((int)reconstructs.getFrames().size() > 0) {
+      refPointCloud = reconstructs[0];
+    }
 
     normals.clear();
     sources.clear();
     reconstructs.clear();
     startFrameNumber = endFrameNumber;
+    std::cout << startFrameNumber << " " << endFrameNumber0 << "\n";
     contextIndex++;
   }
 
