@@ -71,6 +71,7 @@ class PCCDecoderParameters {
   double            maxGeometryDist2Bwd_;
   double            maxColorDist2Fwd_;
   double            maxColorDist2Bwd_;
+  bool              enableMotionEncoding_;
 };
 
 };  // namespace pcc

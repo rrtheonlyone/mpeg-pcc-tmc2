@@ -157,6 +157,12 @@ bool parseParameters( int                   argc,
       decoderParams.keepIntermediateFiles_,
     "Keep intermediate files: RGB, YUV and bin")
 
+    // Motion Encoding 
+    ( "enableMotionEncoding",
+      decoderParams.enableMotionEncoding_,
+      decoderParams.enableMotionEncoding_, 
+      " enable motion encoding " )
+
     // visual quality
     ( "patchColorSubsampling",
       decoderParams.patchColorSubsampling_, 
@@ -278,6 +284,12 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
   size_t              headerSize = pcc::PCCBitstreamReader::read( bitstream, ssvu );
   bitstreamStat.incrHeader( headerSize );
   bool bMoreData = true;
+
+  // Data needed for motion encoding
+  int              motionIndex = 0;
+  PCCMotionDecoder motionDecoder;
+  PCCPointSet3     refPointCloud;
+
   while ( bMoreData ) {
     PCCGroupOfFrames reconstructs;
     PCCContext       context;
@@ -287,17 +299,35 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
 #ifdef BITSTREAM_TRACE
     bitstreamReader.setLogger( logger );
 #endif
+
+    if ( decoderParams.enableMotionEncoding_ && motionIndex > 0) {
+      std::cout << "GOING TO USE MOTION\n";
+
+      PCCPointSet3 nx = motionDecoder.reconstructPointCloud( refPointCloud, motionIndex );
+      reconstructs.setFrameCount(1);
+      reconstructs[0] = nx;
+      reconstructs.write( decoderParams.reconstructedDataPath_, frameNumber );
+
+      motionIndex++;
+      refPointCloud = nx;
+      bMoreData = motionIndex < 4;
+      continue;
+    } 
+
     if ( bitstreamReader.decode( ssvu, context ) == 0 ) { return 0; }
 
     // allocate atlas structure
     context.resizeAtlas( context.getVps().getAtlasCountMinus1() + 1 );
+    
     for ( uint32_t atlId = 0; atlId < context.getVps().getAtlasCountMinus1() + 1; atlId++ ) {
       context.getAtlas( atlId ).allocateVideoFrames( context, 0 );
       // first allocating the structures, frames will be added as the V3C
       // units are being decoded ???
       context.setAtlasIndex( atlId );
+
       int retDecoding = decoder.decode( context, reconstructs, atlId );
       clock.stop();
+
       if ( retDecoding != 0 ) { return retDecoding; }
       if ( metricsParams.computeChecksum_ ) { checksum.computeDecoded( reconstructs ); }
       if ( metricsParams.computeMetrics_ ) {
@@ -314,6 +344,7 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
           }
         }
         metrics.compute( sources, reconstructs, normals );
+
         sources.clear();
         normals.clear();
       }
@@ -323,6 +354,12 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
         frameNumber += reconstructs.getFrameCount();
       }
       bMoreData = ( ssvu.getV3CUnitCount() > 0 );
+    }
+
+    if ( decoderParams.enableMotionEncoding_ ) {
+      if ( (int)reconstructs.getFrames().size() > 0 ) { refPointCloud = reconstructs[0]; }
+      motionIndex++;
+      bMoreData = motionIndex < 4;
     }
   }
   bitstreamStat.trace();

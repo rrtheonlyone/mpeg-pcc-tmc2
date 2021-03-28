@@ -9,42 +9,44 @@ bool PCCMotionEncoder::buildMatchingPoints( const PCCPointSet3& currPointCloud, 
   PCCKdTree currTree( currPointCloud );
   PCCKdTree refTree( refPointCloud );
 
-  matchingPointSet_.resize( refCount );
+  std::cout << currCount << " " << refCount << "\n";
 
-  for ( int i = 0; i < refCount; i++ ) {
-    const PCCPoint3D& refPoint = refPointCloud[i];
-    refNei_                    = PCCNNResult();
-    refTree.search( refPoint, neiPoints_, refNei_ );
+  matchingPointSet_.resize( 0 );
+  matchingPointSet_.resize( currCount, -1 );
+
+  int cnt = 0;
+  for ( int i = 0; i < currCount; i++ ) {
+    const PCCPoint3D& currPoint = currPointCloud[i];
+    currNei_                    = PCCNNResult();
+    currTree.search( currPoint, neiPoints_, currNei_ );
 
     uint32_t bestDiff      = INT32_MAX - 1;
     int      matchingPoint = -1;
 
-    for ( int j = 0; j < currCount; j++ ) {
-      const PCCPoint3D& currPoint = currPointCloud[j];
-      if ( !withinRange( refPoint, currPoint ) ) { continue; }
+    PCCNNResult nxPoints; 
+    refTree.searchRadius(currPoint, neiPoints_, dist_, nxPoints);
 
-      currNei_ = PCCNNResult();
-      currTree.search( currPoint, neiPoints_, currNei_ );
+    for ( int j = 0; j < (int)nxPoints.size(); j++ ) {
+      int p = nxPoints.indices(j);
+      const PCCPoint3D& refPoint = refPointCloud[p];
+      
+      refNei_ = PCCNNResult();
+      refTree.search( refPoint, neiPoints_, refNei_ );
       uint32_t diff = calculateColorDiff( currPointCloud, refPointCloud );
 
       if ( diff < bestDiff ) {
         bestDiff      = diff;
-        matchingPoint = j;
+        matchingPoint = p;
       }
     }
 
-    if ( matchingPoint != -1 && !matchingPointIsValid( currPointCloud, refPointCloud, i, matchingPoint ) ) { matchingPoint = -1; }
-
+    //if ( matchingPoint != -1 && !matchingPointIsValid( currPointCloud, refPointCloud, i, matchingPoint ) ) { matchingPoint = -1; }
     //debugDiff( currPointCloud, refPointCloud, i, matchingPoint );
     matchingPointSet_[i] = matchingPoint;
-  
-    if (i && i % 100 == 0) {
-      std::cout << "encoding point " << i << "....\n";
-    }
   }
 
-  int totalMatched = refCount - std::count( matchingPointSet_.begin(), matchingPointSet_.end(), -1 );
-  return totalMatched >= threshold_;
+  int totalMatched = currCount - std::count( matchingPointSet_.begin(), matchingPointSet_.end(), -1 );
+  return true;
 }
 
 bool PCCMotionEncoder::matchingPointIsValid( const PCCPointSet3& currPointCloud,
@@ -57,19 +59,22 @@ bool PCCMotionEncoder::matchingPointIsValid( const PCCPointSet3& currPointCloud,
   uint16_t dg = std::max( c1[1], c2[1] ) - std::min( c1[1], c2[1] );
   uint16_t db = std::max( c1[2], c2[2] ) - std::min( c1[2], c2[2] );
 
-  const uint16_t mx = ( 1 << 8 );
+  const uint16_t mx = ( 20 ); //magic number, define constant later
   return dr < mx && dg < mx && db < mx;
 }
 
-void PCCMotionEncoder::debugDiff( const PCCPointSet3& currPointCloud,
-                                  const PCCPointSet3& refPointCloud,
+void PCCMotionEncoder::debugDiff( const PCCPointSet3& pi,
+                                  const PCCPointSet3& pj,
                                   int                 i,
                                   int                 j ) {
   std::cout << "[" << i << "," << j << "]";
-  if ( j == -1 ) return;
+  if ( j == -1 ) {
+    std::cout << "\n";
+    return;
+  }
 
-  auto d1 = refPointCloud[i];
-  auto d2 = currPointCloud[j];
+  auto d1 = pi[i];
+  auto d2 = pj[j];
   auto mv = d1 - d2;
 
   std::cout << " MV: ";
@@ -84,8 +89,8 @@ void PCCMotionEncoder::debugDiff( const PCCPointSet3& currPointCloud,
 
   std::cout << "(" << (int)mv[0] << ", " << (int)mv[1] << ", " << (int)mv[2] << ")";
 
-  auto     c1 = refPointCloud.getColor( i );
-  auto     c2 = currPointCloud.getColor( j );
+  auto     c1 = pi.getColor( i );
+  auto     c2 = pj.getColor( j );
   uint16_t dr = std::max( c1[0], c2[0] ) - std::min( c1[0], c2[0] );
   uint16_t dg = std::max( c1[1], c2[1] ) - std::min( c1[1], c2[1] );
   uint16_t db = std::max( c1[2], c2[2] ) - std::min( c1[2], c2[2] );
@@ -141,11 +146,28 @@ bool PCCMotionEncoder::withinRange( const PCCPoint3D& p1, const PCCPoint3D& p2 )
   return ( dx * dx + dy * dy + dz * dz ) <= dist_ * dist_;
 }
 
-void PCCMotionEncoder::writeToFile( std::string fileName ) {
+void PCCMotionEncoder::writeToFile( std::string fileName, const PCCPointSet3& pi, const PCCPointSet3& pj ) {
   std::ofstream outfile( fileName );
   for ( int i = 0; i < (int) matchingPointSet_.size(); i++ ) { 
-    outfile << i << " " << matchingPointSet_[i] << std::endl; 
+    if (matchingPointSet_[i] == -1) continue;
+
+    int j = matchingPointSet_[i];
+    outfile << i << " " << j << " "; 
+  
+    //write motion vector 
+    auto mv = pi[i] - pj[j];
+    outfile << (int)mv[0] << " " << (int)mv[1] << " " << (int)mv[2] << " "; 
+
+    //write deltaT 
+    auto     c1 = pi.getColor( i );
+    auto     c2 = pj.getColor( j );
+    uint16_t dr = std::max( c1[0], c2[0] ) - std::min( c1[0], c2[0] );
+    uint16_t dg = std::max( c1[1], c2[1] ) - std::min( c1[1], c2[1] );
+    uint16_t db = std::max( c1[2], c2[2] ) - std::min( c1[2], c2[2] );
+
+    outfile << (int)dr << " " << (int)dg << " " << (int)db << std::endl;
   }
+  
   outfile.close();
 }
 
@@ -170,16 +192,17 @@ void PCCMotionEncoder::writeAsPict(const PCCPointSet3& refPointCloud) {
 
     //use p to write as picture
     std::cout << i << " " << p.first << " " << p.second << "\n";
+
+
   } 
 
 }
 
- PCCPointSet3 PCCMotionEncoder::reconstructPointCloud( const PCCPointSet3& currPointCloud, const PCCPointSet3& refPointCloud ) {
+PCCPointSet3 PCCMotionEncoder::reconstructPointCloud( const PCCPointSet3& currPointCloud, const PCCPointSet3& refPointCloud ) {
     PCCPointSet3 rec;
     for (int i = 0; i < (int) matchingPointSet_.size(); i++) {
       if (matchingPointSet_[i] == -1) continue;
-      int m = matchingPointSet_[i];
-      rec.addPoint(currPointCloud[m], currPointCloud.getColor(m));  
+      rec.addPoint(currPointCloud[i], currPointCloud.getColor(i));  
     }
     return rec;
 }

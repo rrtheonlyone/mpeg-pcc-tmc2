@@ -18,7 +18,7 @@
 namespace pcc {
 class PCCMotionEncoder {
  public:
-  PCCMotionEncoder() : threshold_( 200000 ), neiPoints_( 5 ), dist_( 3 ) {}
+  PCCMotionEncoder() : threshold_( 2000 ), neiPoints_( 5 ), dist_( 100 ) {}
   ~PCCMotionEncoder() = default;
 
   // TODO: method to write as picture?
@@ -39,7 +39,7 @@ class PCCMotionEncoder {
 
   PCCPointSet3 reconstructPointCloud( const PCCPointSet3& currPointCloud, const PCCPointSet3& refPointCloud );
 
-  void writeToFile( std::string fileName );
+  void writeToFile( std::string fileName, const PCCPointSet3& currPointCloud, const PCCPointSet3& refPointCloud );
   void writeAsPict(const PCCPointSet3& refPointCloud);
 
  private:

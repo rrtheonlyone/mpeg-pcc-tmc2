@@ -65,7 +65,8 @@ void PCCDecoderParameters::print() {
   std::cout << "\t   videoDecoderGeometryPath          " << videoDecoderGeometryPath_ << std::endl;
   std::cout << "\t   videoDecoderAttributePath         " << videoDecoderAttributePath_ << std::endl;
   std::cout << "\t   inverseColorSpaceConversionConfig " << inverseColorSpaceConversionConfig_ << std::endl;
-  std::cout << "\t   patchColorSubsampling             " << patchColorSubsampling_ << std::endl;
+  std::cout << "\t   patchcolorsubsampling             " << patchColorSubsampling_ << std::endl;
+  std::cout << "\t   enableMotionEncoding             " << enableMotionEncoding_ << std::endl;
 }
 
 void PCCDecoderParameters::completePath() {}

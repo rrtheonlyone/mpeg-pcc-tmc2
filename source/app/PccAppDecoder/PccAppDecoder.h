@@ -49,6 +49,7 @@
 #include "PCCBitstreamReader.h"
 #include "PCCDecoderParameters.h"
 #include "PCCMetricsParameters.h"
+#include "PCCMotionDecoder.h"
 #include <program_options_lite.h>
 #include <tbb/tbb.h>
 

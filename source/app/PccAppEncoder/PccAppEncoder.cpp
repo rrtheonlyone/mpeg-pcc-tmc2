@@ -987,14 +987,17 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
     int motionOk = 0;
     if ( encoderParams.enableMotionEncoding_ && refPoint != -1 ) {
       std::cout << "Attempting to use motion encoding..." << std::endl;
-      //motionOk = motionEncoder.buildMatchingPoints( sources[0], refPointCloud );
+      motionOk = motionEncoder.buildMatchingPoints( sources[0], refPointCloud );
+      if (motionOk) {
+          std::string fname = "motion_stream";
+          fname += std::to_string(contextIndex);
+          fname += ".txt";
+          motionEncoder.writeToFile(fname, sources[0], refPointCloud);
+      
+          refPointCloud = motionEncoder.reconstructPointCloud(sources[0], refPointCloud);
+      }
 
       //motionEncoder.writeAsPict( refPointCloud );
-
-      //std::string fname = "motion_stream";
-      //fname += std::to_string(contextIndex);
-      //fname += ".txt";
-      //motionEncoder.writeToFile(fname);
     }
 
     int ret = 0;
