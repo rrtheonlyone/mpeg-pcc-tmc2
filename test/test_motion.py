@@ -15,7 +15,7 @@ def calc_diff(k):
 	e2 = dist(diff(k[1], k[2]))
 	return (e1, e2)
 
-def main():
+def main1():
 	mv_data = []
 	rv_data = []
 
@@ -56,5 +56,20 @@ def main():
 
 	print("\n".join(csv_file))
 
+def main():
+	raw_data = open(f"m3_original.txt", "r")
+	md = defaultdict(int) 
+	for raw_vector in raw_data:
+		raw_vector = raw_vector.strip()
+		dt = [int(x) for x in raw_vector.split(" ")]	
+		md[(dt[0], dt[1], dt[2])] += 1
+
+	for k,v in md.items():
+		if v <= 1: 
+			continue 
+		print(k)
+
+
+
 if __name__ == "__main__":
-	main()
+	main1()

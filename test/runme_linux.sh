@@ -102,7 +102,7 @@ case $COND in
   *) echo "Condition not correct ($COND)";   exit -1;;
 esac
 
-## Encoder 
+# Encoder 
 if [ ! -f $BIN ] 
 then 
   $ENCODER \
@@ -135,5 +135,7 @@ fi
 #  --inverseColorSpaceConversionConfig=${CFGDIR}hdrconvert/yuv420toyuv444_16bit.cfg \
 #  --nbThread=$THREAD \
 #  --reconstructedDataPath=${BIN%.???}_dec_%04d.ply \
-#  --enableMotionEncoding=1
+#  --uncompressedDataPath="${MAINDIR}/loot/loot/Ply/loot_vox10_1%03d.ply"\
+#  --computeMetrics=1\
+#  --enableMotionEncoding=0
 #
