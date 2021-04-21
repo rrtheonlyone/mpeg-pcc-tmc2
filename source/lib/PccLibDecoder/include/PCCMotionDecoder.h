@@ -12,6 +12,7 @@
 #include "PCCImage.h"
 #include "PCCKdTree.h"
 #include <vector>
+#include <map>
 
 namespace pcc {
 class PCCMotionDecoder {
@@ -21,7 +22,10 @@ class PCCMotionDecoder {
   ~PCCMotionDecoder() = default;
 
   PCCPointSet3 reconstructPointCloud( const PCCPointSet3& refPointCloud, int index );
- 
+  PCCPointSet3 reconstructPointCloudFlipped( const PCCPointSet3& refPointCloud, int index );
+  PCCPointSet3 reconstructPointCloudColor( const PCCPointSet3& refPointCloud, int index );
+  void debugPoint( std::string fileName, const PCCPointSet3& p ); 
+
  private:
 };
 

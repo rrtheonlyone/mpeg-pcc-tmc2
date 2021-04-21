@@ -50,6 +50,7 @@ bool PCCGroupOfFrames::load( const std::string&      uncompressedDataPath,
   if ( endFrameNumber < startFrameNumber ) { return false; }
   const size_t frameCount = endFrameNumber - startFrameNumber;
   frames_.resize( frameCount );
+  std::cout << startFrameNumber << " " << endFrameNumber << "\n";
   tbb::task_arena limited( static_cast<int>( nbThread ) );
   limited.execute( [&] {
     tbb::parallel_for( size_t( startFrameNumber ), endFrameNumber, [&]( const size_t frameNumber ) {
@@ -57,6 +58,7 @@ bool PCCGroupOfFrames::load( const std::string&      uncompressedDataPath,
       sprintf( fileName, uncompressedDataPath.c_str(), frameNumber );
       auto& pointSet = frames_[frameNumber - startFrameNumber];
       pointSet.resize( 0 );
+      std::cout << fileName << "\n";
       if ( !pointSet.read( fileName, readNormals ) ) {
         std::cout << "Error: can't open " << fileName << std::endl;
         frames_.resize( frameNumber - startFrameNumber );

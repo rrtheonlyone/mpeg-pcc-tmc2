@@ -373,6 +373,50 @@ int PCCDecoder::decode( PCCContext& context, PCCGroupOfFrames& reconstructs, int
   return 0;
 }
 
+void PCCDecoder::postProcessOnly( PCCContext& context, PCCPointSet3& reconstruct ) {
+    GeneratePointCloudParameters ppSEIParams;
+    setPostProcessingSeiParameters( ppSEIParams, context );
+    bool  isAttributes444 = false;
+    
+    // Post-Processing
+    TRACE_PATCH( "Post-Processing: postprocessSmoothing = %zu pbfEnableFlag = %d \n",
+                 params_.postprocessSmoothingFilter_, ppSEIParams.pbfEnableFlag_ );
+    if ( ppSEIParams.flagGeometrySmoothing_ ) {
+      PCCPointSet3 tempFrameBuffer = reconstruct;
+      if ( !ppSEIParams.pbfEnableFlag_ ) {
+        // These are different attribute transfer functions
+        if ( params_.postprocessSmoothingFilter_ == 1 || params_.postprocessSmoothingFilter_ == 5 ) {
+          TRACE_PATCH( " transferColors16bitBP \n" );
+          tempFrameBuffer.transferColors16bitBP( reconstruct, params_.postprocessSmoothingFilter_, int32_t( 0 ),
+                                                 isAttributes444, 8, 1, true, true, true, false, 4, 4, 1000, 1000,
+                                                 1000 * 256, 1000 * 256 );  // jkie: let's make it general
+        } else if ( params_.postprocessSmoothingFilter_ == 2 ) {
+          TRACE_PATCH( " transferColorWeight \n" );
+          tempFrameBuffer.transferColorWeight( reconstruct, 0.1 );
+        } else if ( params_.postprocessSmoothingFilter_ == 3 ) {
+          TRACE_PATCH( " transferColorsFilter3 \n" );
+          tempFrameBuffer.transferColorsFilter3( reconstruct, int32_t( 0 ), isAttributes444 );
+        } else if ( params_.postprocessSmoothingFilter_ == 7 || params_.postprocessSmoothingFilter_ == 9 ) {
+          TRACE_PATCH( " transferColorsFilter3 \n" );
+          tempFrameBuffer.transferColorsBackward16bitBP( reconstruct, params_.postprocessSmoothingFilter_, int32_t( 0 ),
+                                                         isAttributes444, 8, 1, true, true, true, false, 4, 4, 1000,
+                                                         1000, 1000 * 256, 1000 * 256 );
+        }
+      }
+    }
+    if ( ppSEIParams.flagColorSmoothing_ ) {
+      TRACE_PATCH( " colorSmoothing \n" );
+      colorSmoothing( reconstruct, params_.colorTransform_, ppSEIParams );
+    }
+    if ( !isAttributes444 ) {  // lossy: convert 16-bit yuv444 to 8-bit RGB444
+      TRACE_PATCH( "lossy: convert 16-bit yuv444 to 8-bit RGB444 (convertYUV16ToRGB8) \n" );
+      reconstruct.convertYUV16ToRGB8();
+    } else {  // lossless: copy 16-bit RGB to 8-bit RGB
+      TRACE_PATCH( "lossy: lossless: copy 16-bit RGB to 8-bit RGB (copyRGB16ToRGB8) \n" );
+      reconstruct.copyRGB16ToRGB8();
+    }
+}
+
 void PCCDecoder::setPointLocalReconstruction( PCCContext& context ) {
   auto& asps = context.getAtlasSequenceParameterSet( 0 );
   TRACE_PATCH( "PLR = %d \n", asps.getPLREnabledFlag() );

@@ -54,7 +54,7 @@ class PCCHMLibVideoDecoderImpl {
   PCCHMLibVideoDecoderImpl();
 
   ~PCCHMLibVideoDecoderImpl();
-  void decode( PCCVideoBitstream& bitstream, size_t outputBitDepth, bool RGB2GBR, PCCVideo<T, 3>& video );
+  void decode( PCCVideoBitstream& bitstream, size_t outputBitDepth, bool RGB2GBR, PCCVideo<T, 3>& video, bool lossyChannel = false );
 
  private:
   void               setVideoSize( const pcc_hm::TComSPS* sps );

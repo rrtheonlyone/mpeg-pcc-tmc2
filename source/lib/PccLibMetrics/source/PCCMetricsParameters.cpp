@@ -93,6 +93,7 @@ void PCCMetricsParameters::print() {
 
 bool PCCMetricsParameters::check( bool checkFiles ) {
   bool ret = true;
+  computeC2p_=false;
   if ( computeMetrics_ ) {
     if ( checkFiles ) {
       if ( uncompressedDataPath_.empty() ) {

@@ -42,6 +42,8 @@ int main( int argc, char* argv[] ) {
   PCCDecoderParameters decoderParams;
   PCCMetricsParameters metricsParams;
   if ( !parseParameters( argc, argv, decoderParams, metricsParams ) ) { return -1; }
+  
+  std::cout << metricsParams.computeMetrics_ << ": METRIC START\n";
   if ( decoderParams.nbThread_ > 0 ) { tbb::task_scheduler_init init( static_cast<int>( decoderParams.nbThread_ ) ); }
 
   // Timers to count elapsed wall/user time
@@ -242,6 +244,8 @@ bool parseParameters( int                   argc,
   }
   metricsParams.completePath();
   metricsParams.print();
+  std::cout << metricsParams.computeMetrics_ << ": METRIC FUNC\n";
+  
   if ( !metricsParams.check( true ) ) {
     printf( "Error Input parameters are not correct \n" );
     return false;
@@ -272,6 +276,7 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
   PCCMetrics  metrics;
   PCCChecksum checksum;
   metrics.setParameters( metricsParams );
+
   checksum.setParameters( metricsParams );
   std::vector<std::vector<uint8_t>> checksumsRec;
   std::vector<std::vector<uint8_t>> checksumsDec;
@@ -290,6 +295,7 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
   PCCMotionDecoder motionDecoder;
   PCCPointSet3     refPointCloud;
 
+  std::cout << metricsParams.computeMetrics_ << ": METRIC\n";
   while ( bMoreData ) {
     PCCGroupOfFrames reconstructs;
     PCCContext       context;
@@ -303,13 +309,43 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
     if ( decoderParams.enableMotionEncoding_ && motionIndex > 0) {
       std::cout << "GOING TO USE MOTION\n";
 
-      PCCPointSet3 nx = motionDecoder.reconstructPointCloud( refPointCloud, motionIndex );
+      PCCPointSet3 nx = motionDecoder.reconstructPointCloudColor( refPointCloud, motionIndex );
+
       reconstructs.setFrameCount(1);
       reconstructs[0] = nx;
       reconstructs.write( decoderParams.reconstructedDataPath_, frameNumber );
 
+      std::string tt = "decode_m" + std::to_string(motionIndex) + ".txt";
+      motionDecoder.debugPoint(tt, nx);
+
+      std::string tt1 = "decode_ref_m" + std::to_string(motionIndex) + ".txt";
+      motionDecoder.debugPoint(tt1, refPointCloud);
+
+      if ( motionIndex != -1 ) {
+        refPointCloud = nx; 
+      }
+
+      if ( metricsParams.computeMetrics_ ) {
+        PCCGroupOfFrames sources;
+        PCCGroupOfFrames normals;
+        std::cout << "COMPUTING metrics: " << reconstructs.getFrameCount() <<  "\n";
+        if ( !sources.load( metricsParams.uncompressedDataPath_, frameNumber,
+                            frameNumber + reconstructs.getFrameCount(), decoderParams.colorTransform_ ) ) {
+          return -1;
+        }
+        if ( !metricsParams.normalDataPath_.empty() ) {
+          if ( !normals.load( metricsParams.normalDataPath_, frameNumber, frameNumber + reconstructs.getFrameCount(),
+                              COLOR_TRANSFORM_NONE, true ) ) {
+            return -1;
+          }
+        }
+        metrics.compute( sources, reconstructs, normals );
+
+        sources.clear();
+        normals.clear();
+      }
+
       motionIndex++;
-      refPointCloud = nx;
       bMoreData = motionIndex < 4;
       continue;
     } 
@@ -333,6 +369,7 @@ int decompressVideo( const PCCDecoderParameters& decoderParams,
       if ( metricsParams.computeMetrics_ ) {
         PCCGroupOfFrames sources;
         PCCGroupOfFrames normals;
+        std::cout << "COMPUTING metrics: " << reconstructs.getFrameCount() <<  "\n";
         if ( !sources.load( metricsParams.uncompressedDataPath_, frameNumber,
                             frameNumber + reconstructs.getFrameCount(), decoderParams.colorTransform_ ) ) {
           return -1;

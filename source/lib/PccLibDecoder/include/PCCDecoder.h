@@ -67,6 +67,8 @@ class PCCDecoder : public PCCCodec {
   void createPatchFrameDataStructure( PCCContext& context );
   void createPatchFrameDataStructure( PCCContext& context, size_t atglOrder );
 
+  void postProcessOnly( PCCContext& context, PCCPointSet3& reconstruct );
+
  private:
   void setPointLocalReconstruction( PCCContext& context );
   void setPLRData( PCCFrameContext& tile, PCCPatch& patch, PLRData& plrd, size_t occupancyPackingBlockSize );

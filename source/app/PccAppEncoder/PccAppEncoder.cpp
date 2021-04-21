@@ -993,8 +993,17 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
           fname += std::to_string(contextIndex);
           fname += ".txt";
           motionEncoder.writeToFile(fname, sources[0], refPointCloud);
-      
+
+          std::string tee1 = "m" + std::to_string(contextIndex) + "_ref.txt";
+          motionEncoder.debugPoint(tee1, refPointCloud);
+
           refPointCloud = motionEncoder.reconstructPointCloud(sources[0], refPointCloud);
+
+          std::string tee = "m" + std::to_string(contextIndex) + "_original.txt";
+          motionEncoder.debugPoint(tee, sources[0]);
+
+          std::string te = "m" + std::to_string(contextIndex) + "_recon.txt";
+          motionEncoder.debugPoint(te, refPointCloud);
       }
 
       //motionEncoder.writeAsPict( refPointCloud );
@@ -1015,7 +1024,7 @@ int compressVideo( const PCCEncoderParameters& encoderParams,
 
     PCCGroupOfFrames normals;
     bool             bRunMetric = true;
-    if ( metricsParams.computeMetrics_ ) {
+    if ( metricsParams.computeMetrics_ && false ) {
       if ( !metricsParams.normalDataPath_.empty() ) {
         if ( !normals.load( metricsParams.normalDataPath_, startFrameNumber, endFrameNumber, COLOR_TRANSFORM_NONE,
                             true ) ) {

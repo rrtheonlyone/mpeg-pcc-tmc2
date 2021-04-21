@@ -52,8 +52,20 @@ void PCCHMLibVideoDecoder<T>::decode( PCCVideoBitstream& bitstream,
                                       const std::string& decoderPath,
                                       const std::string& parameters,
                                       const size_t       frameCount ) {
+  
   PCCHMLibVideoDecoderImpl<T> decoder;
-  decoder.decode( bitstream, outputBitDepth, RGB2GBR, video );
+  
+  //Rahul's code 
+  //Here we do a check and simulate loss on either OM/GM/Texture 
+  bool hasLoss = false;
+  
+  //Test #1: Loss on GM
+  if (parameters.find("texture") != std::string::npos && parameters.find("GOF0") != std::string::npos) {
+    hasLoss = true;
+  }
+
+  std::cout << parameters << " " << hasLoss << "\n";
+  decoder.decode( bitstream, outputBitDepth, RGB2GBR, video, hasLoss );
 }
 
 template class pcc::PCCHMLibVideoDecoder<uint8_t>;
